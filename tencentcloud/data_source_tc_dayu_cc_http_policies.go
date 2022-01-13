@@ -140,6 +140,11 @@ func dataSourceTencentCloudDayuCCHttpPolicies() *schema.Resource {
 							Elem:        &schema.Schema{Type: schema.TypeString},
 							Description: "IP of the CC self-define http policy.",
 						},
+						"domain": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "domain of the CC self-define http policy.",
+						},
 					},
 				},
 			},
@@ -187,6 +192,7 @@ func dataSourceTencentCloudDayuCCHttpPoliciesRead(d *schema.ResourceData, meta i
 		listItem["smode"] = *policy.Smode
 		listItem["switch"] = *policy.Switch > 0
 		listItem["ip_list"] = helper.StringsInterfaces(policy.IpList)
+		listItem["domain"] = *policy.Domain
 		if *policy.Smode == "matching" {
 			listItem["action"] = *policy.ExeMode
 			listItem["rule_list"] = flattenCCRuleList(policy.RuleList)

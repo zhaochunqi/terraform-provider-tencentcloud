@@ -172,6 +172,12 @@ func resourceTencentCloudDayuCCHttpPolicy() *schema.Resource {
 				ValidateFunc: validateIp,
 				Description:  "Ip of the CC self-define http policy, only valid when `resource_type` is `bgp-multip`. The num of list items can only be set one.",
 			},
+			"domain": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "Domain that the CC self-define http policy works for, only valid when `protocol` is `http`.",
+			},
 			//computed
 			"create_time": {
 				Type:        schema.TypeString,
@@ -242,6 +248,10 @@ func resourceTencentCloudDayuCCHttpPolicyCreate(d *schema.ResourceData, meta int
 		ccPolicy.RuleList = append(ccPolicy.RuleList, &ccRule)
 	}
 
+	if v, ok := d.GetOk("domain"); ok {
+		ccPolicy.Domain = helper.String(v.(string))
+	}
+
 	dayuService := DayuService{client: meta.(*TencentCloudClient).apiV3Conn}
 
 	policyId := ""
@@ -302,6 +312,7 @@ func resourceTencentCloudDayuCCHttpPolicyRead(d *schema.ResourceData, meta inter
 	_ = d.Set("smode", policy.Smode)
 	_ = d.Set("policy_id", policy.SetId)
 	_ = d.Set("action", policy.ExeMode)
+	_ = d.Set("domain", policy.Domain)
 	ipList := helper.StringsInterfaces(policy.IpList)
 	if len(ipList) == 1 {
 		_ = d.Set("ip", ipList[0])
@@ -358,7 +369,7 @@ func resourceTencentCloudDayuCCHttpPolicyUpdate(d *schema.ResourceData, meta int
 		ccPolicy.Switch = helper.IntUint64(0)
 	}
 
-	ruleList := d.Get("rule_list").([]interface{})
+	ruleList := d.Get("rule_list").(*schema.Set).List()
 	ccPolicy.RuleList = make([]*dayu.CCRule, 0, len(ruleList))
 	for _, rule := range ruleList {
 		var ccRule dayu.CCRule
@@ -376,6 +387,9 @@ func resourceTencentCloudDayuCCHttpPolicyUpdate(d *schema.ResourceData, meta int
 		ccPolicy.IpList = []*string{&ip}
 	} else {
 		ccPolicy.IpList = []*string{}
+	}
+	if v, ok := d.GetOk("domain"); ok {
+		ccPolicy.Domain = helper.String(v.(string))
 	}
 	dayuService := DayuService{client: meta.(*TencentCloudClient).apiV3Conn}
 
