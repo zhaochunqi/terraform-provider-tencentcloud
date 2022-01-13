@@ -1036,8 +1036,104 @@ func (me *DayuService) DescribeL7Rules(ctx context.Context, resourceType string,
 	}
 }
 
+func (me *DayuService) DescribeL7RulesV2(ctx context.Context, resourceType string, resourceId string, ruleDomain string, ruleId string, protocol string) (infos []*dayu.NewL7RuleEntry, healths []*dayu.L7RuleHealth, has bool, errRet error) {
+	logId := getLogId(ctx)
+	request := dayu.NewDescribleNewL7RulesRequest()
+
+	infos = make([]*dayu.NewL7RuleEntry, 0, 100)
+	healths = make([]*dayu.L7RuleHealth, 0, 100)
+	defer func() {
+		if errRet != nil {
+			log.Printf("[CRITAL]%s api[%s] fail,reason[%s]", logId, request.GetAction(), errRet.Error())
+		}
+	}()
+
+	var offset, limit uint64 = 0, 20
+
+	request.Business = &resourceType
+	if protocol != "" {
+		request.ProtocolList = []*string{&protocol}
+	}
+
+	if ruleDomain != "" {
+		request.Domain = &ruleDomain
+	}
+	request.Offset = &offset
+	request.Limit = &limit
+	for {
+		ratelimit.Check(request.GetAction())
+		response, err := me.client.UseDayuClient().DescribleNewL7Rules(request)
+
+		if err != nil {
+			if sdkErr, ok := err.(*sdkError.TencentCloudSDKError); ok {
+				if sdkErr.Code == "InvalidParameterValue" {
+					errRet = nil
+					return
+				}
+			}
+			errRet = err
+			return
+		}
+		if response == nil || response.Response == nil {
+			errRet = fmt.Errorf("TencentCloud SDK return nil response,%s", request.GetAction())
+			return
+		}
+		if ruleId == "" {
+			infos = append(infos, response.Response.Rules...)
+			healths = append(healths, response.Response.Healths...)
+		} else {
+			for _, rule := range response.Response.Rules {
+				if *rule.RuleId != ruleId {
+					continue
+				}
+				infos = append(infos, rule)
+				//get right health, the SDK returns with no order
+				var theHealth dayu.L7RuleHealth
+				for _, health := range response.Response.Healths {
+					if *health.RuleId != *rule.RuleId {
+						continue
+					}
+					theHealth = *health
+				}
+				healths = append(healths, &theHealth)
+			}
+		}
+		if len(response.Response.Rules) < int(limit) {
+			if len(infos) > 0 {
+				has = true
+			}
+			return
+		}
+		offset += limit
+	}
+}
+
 func (me *DayuService) DescribeL7Rule(ctx context.Context, resourceType string, resourceId string, ruleId string) (infos *dayu.L7RuleEntry, health *dayu.L7RuleHealth, has bool, errRet error) {
 	policies, healths, _, err := me.DescribeL7Rules(ctx, resourceType, resourceId, "", ruleId, "")
+	if err != nil {
+		errRet = err
+		return
+	}
+
+	length := len(policies)
+	if length == 0 {
+		return
+	}
+	if length > 1 {
+		errRet = fmt.Errorf("Create l7 rule returns %d rules", length)
+		return
+	}
+
+	infos = policies[0]
+	if len(healths) > 0 {
+		health = healths[0]
+	}
+	has = true
+	return
+}
+
+func (me *DayuService) DescribeL7RuleV2(ctx context.Context, resourceType string, resourceId string, ruleId string) (infos *dayu.NewL7RuleEntry, health *dayu.L7RuleHealth, has bool, errRet error) {
+	policies, healths, _, err := me.DescribeL7RulesV2(ctx, resourceType, resourceId, "", ruleId, "")
 	if err != nil {
 		errRet = err
 		return
@@ -1181,6 +1277,52 @@ func (me *DayuService) CreateL7Rule(ctx context.Context, resourceType string, re
 	return
 }
 
+func (me *DayuService) CreateL7RuleV2(ctx context.Context, resourceType string, resourceId string, resourceIp string, rule dayu.L7RuleEntry) (ruleId string, errRet error) {
+	logId := getLogId(ctx)
+	request := dayu.NewCreateNewL7RulesRequest()
+	defer func() {
+		if errRet != nil {
+			log.Printf("[CRITAL]%s api[%s] fail,reason[%s]", logId, request.GetAction(), errRet.Error())
+		}
+	}()
+	request.IdList = []*string{&resourceId}
+	request.VipList = []*string{&resourceIp}
+	request.Business = &resourceType
+	request.Rules = []*dayu.L7RuleEntry{&rule}
+	ratelimit.Check(request.GetAction())
+	response, err := me.client.UseDayuClient().CreateNewL7Rules(request)
+	if err != nil {
+		errRet = err
+		return
+	}
+
+	if response == nil || response.Response == nil || response.Response.Success == nil {
+		errRet = fmt.Errorf("TencentCloud SDK return nil response,%s", request.GetAction())
+		return
+	}
+
+	if *response.Response.Success.Code != "Success" {
+		errRet = fmt.Errorf("TencentCloud SDK return %s response,%s", *response.Response.Success.Code, *response.Response.Success.Message)
+		return
+	}
+
+	//describe rules to get rule ID
+	rules, _, has, dErr := me.DescribeL7RulesV2(ctx, resourceType, resourceId, *rule.Domain, "", "")
+	if dErr != nil {
+		errRet = dErr
+		return
+	}
+	if !has {
+		errRet = fmt.Errorf("Create L7 rule failed")
+		return
+	}
+	if len(rules) != 1 {
+		errRet = fmt.Errorf("Create L7 rule returns %d rules", len(rules))
+	}
+	ruleId = *rules[0].RuleId
+	return
+}
+
 func (me *DayuService) ModifyL7Rule(ctx context.Context, resourceType string, resourceId string, rule dayu.L7RuleEntry) (errRet error) {
 	logId := getLogId(ctx)
 	request := dayu.NewModifyL7RulesRequest()
@@ -1194,6 +1336,37 @@ func (me *DayuService) ModifyL7Rule(ctx context.Context, resourceType string, re
 	request.Rule = &rule
 	ratelimit.Check(request.GetAction())
 	response, err := me.client.UseDayuClient().ModifyL7Rules(request)
+	if err != nil {
+		errRet = err
+		return
+	}
+
+	if response == nil || response.Response == nil || response.Response.Success == nil {
+		errRet = fmt.Errorf("TencentCloud SDK return nil response,%s", request.GetAction())
+		return
+	}
+
+	if *response.Response.Success.Code != "Success" {
+		errRet = fmt.Errorf("TencentCloud SDK return %s response,%s", *response.Response.Success.Code, *response.Response.Success.Message)
+		return
+	}
+
+	return
+}
+
+func (me *DayuService) ModifyL7RuleV2(ctx context.Context, resourceType string, resourceId string, rule dayu.NewL7RuleEntry) (errRet error) {
+	logId := getLogId(ctx)
+	request := dayu.NewModifyNewDomainRulesRequest()
+	defer func() {
+		if errRet != nil {
+			log.Printf("[CRITAL]%s api[%s] fail,reason[%s]", logId, request.GetAction(), errRet.Error())
+		}
+	}()
+	request.Id = &resourceId
+	request.Business = &resourceType
+	request.Rule = &rule
+	ratelimit.Check(request.GetAction())
+	response, err := me.client.UseDayuClient().ModifyNewDomainRules(request)
 	if err != nil {
 		errRet = err
 		return

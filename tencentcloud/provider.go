@@ -943,6 +943,7 @@ func Provider() terraform.ResourceProvider {
 			"tencentcloud_dayu_ddos_policy_attachment":             resourceTencentCloudDayuDdosPolicyAttachment(),
 			"tencentcloud_dayu_l4_rule":                            resourceTencentCloudDayuL4Rule(),
 			"tencentcloud_dayu_l7_rule":                            resourceTencentCloudDayuL7Rule(),
+			"tencentcloud_dayu_l7_rule_v2":                         resourceTencentCloudDayuL7RuleV2(),
 			"tencentcloud_gaap_proxy":                              resourceTencentCloudGaapProxy(),
 			"tencentcloud_gaap_realserver":                         resourceTencentCloudGaapRealserver(),
 			"tencentcloud_gaap_layer4_listener":                    resourceTencentCloudGaapLayer4Listener(),

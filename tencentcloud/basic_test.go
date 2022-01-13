@@ -26,13 +26,16 @@ const (
 	defaultInsName       = "tf-ci-test"
 	defaultInsNameUpdate = "tf-ci-test-update"
 
-	defaultSshCertificate  = "f8kGFR2T"
-	defaultSshCertificateB = "fbW9Spiy"
+	defaultSshCertificate   = "f8kGFR2T"
+	defaultSshCertificateV2 = "swDYFQfB"
+	defaultSshCertificateB  = "fbW9Spiy"
 
-	defaultDayuBgp    = "bgp-000006mq"
-	defaultDayuBgpMul = "bgp-0000008o"
-	defaultDayuBgpIp  = "bgpip-00000294"
-	defaultDayuNet    = "net-0000007e"
+	defaultDayuBgp     = "bgp-000006mq"
+	defaultDayuBgpMul  = "bgp-0000008o"
+	defaultDayuBgpIp   = "bgpip-00000294"
+	defaultDayuBgpIpV2 = "119.28.217.253"
+	defaultDayuBgpIdV2 = "bgpip-000004x0"
+	defaultDayuNet     = "net-0000007e"
 
 	defaultGaapProxyId = "link-5b4g19qx"
 
