@@ -1,67 +1,71 @@
 /*
-Use this resource to create dayu DDoS policy
+Use this resource to create dayu DDoS policy v2
 
 Example Usage
 
 ```hcl
-resource "tencentcloud_dayu_ddos_policy" "test_policy" {
-  resource_type = "bgpip"
-  name          = "tf_test_policy"
-  black_ips     = ["1.1.1.1"]
-  white_ips     = ["2.2.2.2"]
+resource "tencentcloud_dayu_ddos_policy_v2" "asd" {
+  resource_id = "bgpip-000004x0"
+    white_ips   = null
+    black_ips   = ["1.2.2.2", "1.2.3.5"]
+    port_acls {
+      action       = "drop"
+      d_end_port   = 200
+      d_start_port = 101
+      priority     = 10
+      protocol     = "all"
+      s_end_port   = 100
+      s_start_port = 1
+    }
+    port_acls {
+      action       = "drop"
+      d_end_port   = 300
+      d_start_port = 201
+      priority     = 10
+      protocol     = "all"
+      s_end_port   = 100
+      s_start_port = 1
+    }
+    ddos_ai = "on"
+    drop_options {
+      drop_icmp        = false
+      drop_other       = true
+      drop_tcp         = false
+      drop_udp         = false
+      null_conn_enable = true
+    }
+    geo_ip_blocks {
+      action      = "drop"
+      area_list   = []
+      region_type = "oversea"
+    }
+    packet_filters {
+      action         = "transmit"
+      d_end_port     = 12
+      d_start_port   = 12
+      depth          = 0
+      is_include     = false
+      match_begin    = "no_match"
+      offset         = 0
+      pkt_length_max = 1024
+      pkt_length_min = 1024
+      protocol       = "all"
+      s_end_port     = 80
+      s_start_port   = 80
+    }
+  speed_limits {
+    dst_port_list = "1-80;8999"
+    mode          = 1
+    protocol_list = "SMP"
+    speed_values {
+      type  = 1
+      value = 20
+    }
+    speed_values {
+      type  = 2
+      value = 10
+    }
 
-  drop_options {
-    drop_tcp           = true
-    drop_udp           = true
-    drop_icmp          = true
-    drop_other         = true
-    drop_abroad        = true
-    check_sync_conn    = true
-    s_new_limit        = 100
-    d_new_limit        = 100
-    s_conn_limit       = 100
-    d_conn_limit       = 100
-    tcp_mbps_limit     = 100
-    udp_mbps_limit     = 100
-    icmp_mbps_limit    = 100
-    other_mbps_limit   = 100
-    bad_conn_threshold = 100
-    null_conn_enable   = true
-    conn_timeout       = 500
-    syn_rate           = 50
-    syn_limit          = 100
-  }
-
-  port_limits {
-    start_port = "2000"
-    end_port   = "2500"
-    protocol   = "all"
-    action     = "drop"
-    kind       = 1
-  }
-
-  packet_filters {
-    protocol       = "tcp"
-    action         = "drop"
-    d_start_port   = 1000
-    d_end_port     = 1500
-    s_start_port   = 2000
-    s_end_port     = 2500
-    pkt_length_max = 1400
-    pkt_length_min = 1000
-    is_include     = true
-    match_begin    = "begin_l5"
-    match_type     = "pcre"
-    depth          = 1000
-    offset         = 500
-  }
-
-  watermark_filters {
-    tcp_port_list = ["2000-3000", "3500-4000"]
-    udp_port_list = ["5000-6000"]
-    offset        = 50
-    auto_remove   = true
-    open_switch   = true
   }
 }
 ```
@@ -70,6 +74,7 @@ package tencentcloud
 
 import (
 	"context"
+	"log"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 )
@@ -89,7 +94,7 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 			},
 			"ddos_ai": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				ValidateFunc: validateAllowedStringValue(DDOS_AI_SWITCH),
 				Description:  "AI protection switch,  Valid values are `on`, `off`.",
 			},
@@ -101,13 +106,12 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 						"protocol": {
 							Type:         schema.TypeString,
 							Optional:     true,
-							ValidateFunc: validateAllowedStringValue(DAYU_PROTOCOL),
+							ValidateFunc: validateAllowedStringValue(DDOS_PROTOCOL),
 							Description:  "Protocol. Valid values are `tcp`, `udp`, `all`.",
 						},
 						"d_start_port": {
 							Type:         schema.TypeInt,
 							Optional:     true,
-							Default:      0,
 							ValidateFunc: validatePort,
 							Description:  "Destination start port. Valid value ranges: (0~65535).",
 						},
@@ -121,14 +125,12 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 						"s_start_port": {
 							Type:         schema.TypeInt,
 							Optional:     true,
-							Default:      0,
 							ValidateFunc: validatePort,
 							Description:  "Source start port. Valid value ranges: (0~65535).",
 						},
 						"s_end_port": {
 							Type:         schema.TypeInt,
 							Optional:     true,
-							Default:      65535,
 							ValidateFunc: validatePort,
 							Description:  "Source end port. Valid value ranges: (0~65535). It must be greater than `s_start_port`.",
 						},
@@ -141,7 +143,7 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 						"priority": {
 							Type:         schema.TypeInt,
 							Optional:     true,
-							ValidateFunc: validateStringLengthInRange(0, 1000),
+							ValidateFunc: validateIntegerInRange(0, 1000),
 							Description:  "The priority of port acl rule. Valid value ranges: (0~1000). The smaller the number, the higher the priority, and the default priority is 10",
 						},
 					},
@@ -261,7 +263,7 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 			},
 			"drop_options": {
 				Type:     schema.TypeList,
-				Required: true,
+				Optional: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"drop_tcp": {
@@ -292,6 +294,60 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 					},
 				},
 				Description: "Option list of abnormal check of the DDos policy, should set at least one policy.",
+			},
+			"connect_limits": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"sd_new_limit": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "The limit on the number of news per second based on source IP and destination IP.",
+						},
+						"sd_conn_limit": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Concurrent connection control based on source IP and destination IP.",
+						},
+						"dst_new_limit": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Limit on the number of news per second based on the destination IP.",
+						},
+						"dst_conn_limit": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Concurrent connection control based on destination IP and destination port.",
+						},
+						"bad_conn_threshold": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Abnormal connection detection conditions, empty connection guard switch, value are true and false.",
+						},
+						"syn_rate": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Anomalous connection detection condition, percentage of syn ack, value range [0,100].",
+						},
+						"syn_limit": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Anomaly connection detection condition, syn threshold, value range [0,100].",
+						},
+						"conn_timeout": {
+							Type:        schema.TypeInt,
+							Required:    true,
+							Description: "Abnormal connection detection condition, connection timeout, value range [0,65535].",
+						},
+						"null_conn_enable": {
+							Type:        schema.TypeBool,
+							Required:    true,
+							Description: "Indicate whether to drop ICMP protocol or not.",
+						},
+					},
+				},
+				Description: "Connection suppression configuration details.",
 			},
 			"speed_limits": {
 				Type:     schema.TypeList,
@@ -339,8 +395,8 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 				Description: "Watermark policy options, and only support one watermark policy at most.",
 			},
 			"geo_ip_blocks": {
-				Type:     schema.TypeSet,
-				Required: true,
+				Type:     schema.TypeList,
+				Optional: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"region_type": {
@@ -358,7 +414,6 @@ func resourceTencentCloudDayuDdosPolicyV2() *schema.Resource {
 							Optional: true,
 							Elem: &schema.Schema{
 								Type:        schema.TypeInt,
-								Required:    true,
 								Description: "Area number list.",
 							},
 							Description: "Area LIst. When the RegionType is customized, the AreaList must be filled in, and a maximum of 128 must be filled in.",
@@ -377,12 +432,19 @@ func resourceTencentCloudDayuDdosPolicyCreateV2(d *schema.ResourceData, meta int
 	logId := getLogId(contextNil)
 	ctx := context.WithValue(context.TODO(), logIdKey, logId)
 
-	// resourceType := d.Get("resource_type").(string)
 	resourceId := d.Get("resource_id").(string)
 
 	// set IpBlackWhite
-	blackIps := d.Get("black_ips").(*schema.Set).List()
-	whiteIps := d.Get("white_ips").(*schema.Set).List()
+	var blackIps []interface{}
+	var whiteIps []interface{}
+
+	if v, ok := d.GetOk("black_ips"); ok {
+		blackIps = v.(*schema.Set).List()
+	}
+	if v, ok := d.GetOk("white_ips"); ok {
+		whiteIps = v.(*schema.Set).List()
+	}
+
 	antiddosService := AntiddosService{client: meta.(*TencentCloudClient).apiV3Conn}
 	err := antiddosService.CreateIpBlackWhite(resourceId, blackIps, whiteIps)
 	if err != nil {
@@ -390,46 +452,66 @@ func resourceTencentCloudDayuDdosPolicyCreateV2(d *schema.ResourceData, meta int
 	}
 
 	// set PortAcls
-	portAclMapping := d.Get("port_filters").([]interface{})
+	var portAclMapping []interface{}
+	if v, ok := d.GetOk("port_acls"); ok {
+		portAclMapping = v.([]interface{})
+	}
 	err = antiddosService.CreatePortAcl(ctx, resourceId, portAclMapping)
 	if err != nil {
 		return err
 	}
 
 	//set DropOption
-	dropMapping := d.Get("drop_options").([]interface{})
+	var dropMapping []interface{}
+	if v, ok := d.GetOk("drop_options"); ok {
+		dropMapping = v.([]interface{})
+	}
 	err = antiddosService.CreateDropOption(ctx, resourceId, dropMapping)
 	if err != nil {
 		return err
 	}
 
+	//set DDoSAI protection
+	var ddosAi string
+	if v, ok := d.GetOk("ddos_ai"); ok {
+		ddosAi = v.(string)
+	}
+	err = antiddosService.CreateAIProtection(ctx, resourceId, ddosAi)
+	if err != nil {
+		return err
+	}
+
 	//set DDoSPolicyPacketFilter
-	packetFilterMapping := d.Get("packet_filters").([]interface{})
+	var packetFilterMapping []interface{}
+	if v, ok := d.GetOk("packet_filters"); ok {
+		packetFilterMapping = v.([]interface{})
+	}
 	err = antiddosService.CreatePacketFilter(ctx, resourceId, packetFilterMapping)
 	if err != nil {
 		return err
 	}
 
 	//set DDoSSpeedLimitConfig
-	speedLimitMapping := d.Get("speed_limits").([]interface{})
+	var speedLimitMapping []interface{}
+	if v, ok := d.GetOk("speed_limits"); ok {
+		speedLimitMapping = v.([]interface{})
+	}
 	err = antiddosService.CreateDDoSSpeedLimitConfig(ctx, resourceId, speedLimitMapping)
 	if err != nil {
 		return err
 	}
 
-	//set DDoSAI protection
-	ddosAi := d.Get("ddos_ai").(string)
-	err = antiddosService.CreateAIProtection(ctx, resourceId, ddosAi)
-	if err != nil {
-		return err
-	}
-
 	//set DDoSGeoIPBlockConfig
-	geoIpBlockMapping := d.Get("geo_ip_blocks").(*schema.Set).List()
+	var geoIpBlockMapping []interface{}
+	if v, ok := d.GetOk("geo_ip_blocks"); ok {
+		geoIpBlockMapping = v.([]interface{})
+	}
 	err = antiddosService.CreateDDoSGeoIPBlockConfig(ctx, resourceId, geoIpBlockMapping)
 	if err != nil {
 		return err
 	}
+
+	d.SetId(resourceId)
 
 	return resourceTencentCloudDayuDdosPolicyReadV2(d, meta)
 }
@@ -437,11 +519,164 @@ func resourceTencentCloudDayuDdosPolicyCreateV2(d *schema.ResourceData, meta int
 func resourceTencentCloudDayuDdosPolicyReadV2(d *schema.ResourceData, meta interface{}) error {
 	defer logElapsed("resource.tencentcloud_dayu_ddos_policy_v2.read")()
 
-	// logId := getLogId(contextNil)
+	logId := getLogId(contextNil)
 	// ctx := context.WithValue(context.TODO(), logIdKey, logId)
 
-	// resourceId := d.Get("resource_id").(string)
-	// antiddosService := AntiddosService{client: meta.(*TencentCloudClient).apiV3Conn}
+	resourceId := "bgpip-000004x0"
+	antiddosService := AntiddosService{client: meta.(*TencentCloudClient).apiV3Conn}
+	ipList, err := antiddosService.DescribeBlackWhiteIpList(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeBlackWhiteIpList error, reason:%s\n", logId, err)
+		return nil
+	}
+	blackIps := make([]string, 0)
+	whiteIps := make([]string, 0)
+	for _, ip := range ipList {
+		if *ip.Type == DDOS_BLACK_TYPE {
+			blackIps = append(blackIps, *ip.Ip)
+		}
+		if *ip.Type == DDOS_WHITE_TYPE {
+			whiteIps = append(whiteIps, *ip.Ip)
+		}
+	}
+	_ = d.Set("black_ips", blackIps)
+	_ = d.Set("white_ips", whiteIps)
+	aclList, err := antiddosService.DescribeListPortAclList(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeListPortAclList error, reason:%s\n", logId, err)
+		return nil
+	}
+	portAcls := make([]map[string]interface{}, 0)
+	for _, acl := range aclList {
+		tmpPortAcl := make(map[string]interface{})
+		tmpPortAcl["protocol"] = *acl.AclConfig.ForwardProtocol
+		tmpPortAcl["d_start_port"] = *acl.AclConfig.DPortStart
+		tmpPortAcl["d_end_port"] = *acl.AclConfig.DPortEnd
+		tmpPortAcl["s_start_port"] = *acl.AclConfig.SPortStart
+		tmpPortAcl["s_end_port"] = *acl.AclConfig.SPortEnd
+		tmpPortAcl["action"] = *acl.AclConfig.Action
+		tmpPortAcl["priority"] = *acl.AclConfig.Priority
+
+		portAcls = append(portAcls, tmpPortAcl)
+	}
+	_ = d.Set("port_acls", portAcls)
+
+	protocolBlockList, err := antiddosService.DescribeListProtocolBlockConfig(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeListProtocolBlockConfig error, reason:%s\n", logId, err)
+		return nil
+	}
+	dropOptions := make([]map[string]interface{}, 0)
+	for _, protocolBlock := range protocolBlockList {
+		tmpDropOption := make(map[string]interface{})
+
+		tmpDropOption["drop_tcp"] = *protocolBlock.ProtocolBlockConfig.DropTcp == 1
+		tmpDropOption["drop_udp"] = *protocolBlock.ProtocolBlockConfig.DropUdp == 1
+		tmpDropOption["drop_icmp"] = *protocolBlock.ProtocolBlockConfig.DropIcmp == 1
+		tmpDropOption["drop_other"] = *protocolBlock.ProtocolBlockConfig.DropOther == 1
+		tmpDropOption["null_conn_enable"] = *protocolBlock.ProtocolBlockConfig.CheckExceptNullConnect == 1
+		dropOptions = append(dropOptions, tmpDropOption)
+	}
+	_ = d.Set("drop_options", dropOptions)
+
+	aiConfigList, err := antiddosService.DescribeListDDoSAI(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeListDDoSAI error, reason:%s\n", logId, err)
+		return nil
+	}
+	if len(aiConfigList) > 0 {
+		ddosAi := *aiConfigList[0].DDoSAI
+		_ = d.Set("ddos_ai", ddosAi)
+	}
+
+	geoIPBlockConfigList, err := antiddosService.DescribeListDDoSGeoIPBlockConfig(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeListDDoSGeoIPBlockConfig error, reason:%s\n", logId, err)
+		return nil
+	}
+	geoIpBlocks := make([]map[string]interface{}, 0)
+	for _, geoIPBlockConfig := range geoIPBlockConfigList {
+		geoIpBlock := make(map[string]interface{})
+
+		geoIpBlock["region_type"] = *geoIPBlockConfig.GeoIPBlockConfig.RegionType
+		geoIpBlock["action"] = *geoIPBlockConfig.GeoIPBlockConfig.Action
+		geoIpBlock["area_list"] = geoIPBlockConfig.GeoIPBlockConfig.AreaList
+		geoIpBlocks = append(geoIpBlocks, geoIpBlock)
+	}
+	_ = d.Set("geo_ip_blocks", geoIpBlocks)
+
+	speedLimitConfigList, err := antiddosService.DescribeListDDoSSpeedLimitConfig(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s speedLimitConfigList error, reason:%s\n", logId, err)
+		return nil
+	}
+	speedLimitConfigs := make([]map[string]interface{}, 0)
+	for _, speedLimitConfig := range speedLimitConfigList {
+		tmpSpeedLimitConfig := make(map[string]interface{})
+		speedValues := make([]map[string]interface{}, 0)
+		for _, speedValue := range speedLimitConfig.SpeedLimitConfig.SpeedValues {
+			tmpSpeedValue := make(map[string]interface{})
+			tmpSpeedValue["type"] = speedValue.Type
+			tmpSpeedValue["value"] = speedValue.Value
+			speedValues = append(speedValues, tmpSpeedValue)
+		}
+		tmpSpeedLimitConfig["speed_values"] = speedValues
+		tmpSpeedLimitConfig["mode"] = speedLimitConfig.SpeedLimitConfig.Mode
+		tmpSpeedLimitConfig["protocol_list"] = speedLimitConfig.SpeedLimitConfig.ProtocolList
+		tmpSpeedLimitConfig["dst_port_list"] = speedLimitConfig.SpeedLimitConfig.DstPortList
+		speedLimitConfigs = append(speedLimitConfigs, tmpSpeedLimitConfig)
+	}
+	_ = d.Set("speed_limits", speedLimitConfigs)
+
+	packetFilterConfigList, err := antiddosService.DescribeListPacketFilterConfig(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeListPacketFilterConfig error, reason:%s\n", logId, err)
+		return nil
+	}
+	packetFilterConfigs := make([]map[string]interface{}, 0)
+	for _, packetFilterConfig := range packetFilterConfigList {
+		tmpPacketFilterConfig := make(map[string]interface{})
+
+		tmpPacketFilterConfig["protocol"] = *packetFilterConfig.PacketFilterConfig.Protocol
+		tmpPacketFilterConfig["d_start_port"] = *packetFilterConfig.PacketFilterConfig.DportStart
+		tmpPacketFilterConfig["d_end_port"] = *packetFilterConfig.PacketFilterConfig.DportEnd
+		tmpPacketFilterConfig["s_start_port"] = *packetFilterConfig.PacketFilterConfig.SportStart
+		tmpPacketFilterConfig["s_end_port"] = *packetFilterConfig.PacketFilterConfig.SportEnd
+		tmpPacketFilterConfig["pkt_length_min"] = *packetFilterConfig.PacketFilterConfig.PktlenMin
+		tmpPacketFilterConfig["pkt_length_max"] = *packetFilterConfig.PacketFilterConfig.PktlenMax
+		tmpPacketFilterConfig["match_begin"] = *packetFilterConfig.PacketFilterConfig.MatchBegin
+		tmpPacketFilterConfig["match_type"] = *packetFilterConfig.PacketFilterConfig.MatchType
+		tmpPacketFilterConfig["match_str"] = *packetFilterConfig.PacketFilterConfig.Str
+		tmpPacketFilterConfig["depth"] = *packetFilterConfig.PacketFilterConfig.Depth
+		tmpPacketFilterConfig["offset"] = *packetFilterConfig.PacketFilterConfig.Offset
+		tmpPacketFilterConfig["is_include"] = *packetFilterConfig.PacketFilterConfig.IsNot == 1
+		tmpPacketFilterConfig["action"] = *packetFilterConfig.PacketFilterConfig.Action
+		packetFilterConfigs = append(packetFilterConfigs, tmpPacketFilterConfig)
+	}
+	_ = d.Set("packet_filters", packetFilterConfigs)
+
+	connectLimitList, err := antiddosService.DescribeDDoSConnectLimitList(resourceId)
+	if err != nil {
+		log.Printf("[CRITAL]%s DescribeDDoSConnectLimitList error, reason:%s\n", logId, err)
+		return nil
+	}
+	connectLimits := make([]map[string]interface{}, 0)
+	for _, connectLimit := range connectLimitList {
+		tmpconnectLimit := make(map[string]interface{})
+
+		tmpconnectLimit["sd_new_limit"] = *connectLimit.ConnectLimitConfig.SdNewLimit
+		tmpconnectLimit["sd_conn_limit"] = *connectLimit.ConnectLimitConfig.SdConnLimit
+		tmpconnectLimit["dst_new_limit"] = *connectLimit.ConnectLimitConfig.DstNewLimit
+		tmpconnectLimit["dst_conn_limit"] = *connectLimit.ConnectLimitConfig.DstConnLimit
+		tmpconnectLimit["bad_conn_threshold"] = *connectLimit.ConnectLimitConfig.BadConnThreshold
+		tmpconnectLimit["syn_rate"] = *connectLimit.ConnectLimitConfig.SynRate
+		tmpconnectLimit["syn_limit"] = *connectLimit.ConnectLimitConfig.SynLimit
+		tmpconnectLimit["conn_timeout"] = *connectLimit.ConnectLimitConfig.ConnTimeout
+		tmpconnectLimit["null_conn_enable"] = *connectLimit.ConnectLimitConfig.NullConnEnable == 1
+
+		connectLimits = append(connectLimits, tmpconnectLimit)
+	}
+	_ = d.Set("connect_limits", connectLimits)
 
 	return nil
 }

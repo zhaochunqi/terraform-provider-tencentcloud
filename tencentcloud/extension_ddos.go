@@ -60,6 +60,10 @@ const (
 
 var DDOS_AI_SWITCH = []string{DDOS_AI_SWITCH_ON, DDOS_AI_SWITCH_OFF}
 
+const (
+	DDOS_REGION_TYPE = "customized"
+)
+
 func bool2int64(v bool) int64 {
 	result := int64(0)
 	if v {

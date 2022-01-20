@@ -25,6 +25,7 @@ func (me *AntiddosService) DescribeBlackWhiteIpList(instanceId string) (result [
 	result = make([]*antiddos.BlackWhiteIpRelation, 0)
 	limit := int64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListBlackWhiteIpListResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -64,46 +65,87 @@ func (me *AntiddosService) CreateIpBlackWhite(instanceId string, blackIps []inte
 	for _, whiteIp := range whiteIps {
 		whiteIpsWithMask = append(whiteIpsWithMask, &antiddos.IpSegment{Ip: helper.String(whiteIp.(string)), Mask: helper.IntUint64(0)})
 	}
-	err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
-		request := antiddos.NewCreateDDoSBlackWhiteIpListRequest()
-		ratelimit.Check(request.GetAction())
-		request.InstanceId = helper.String(instanceId)
-		request.IpList = blackIpsWithMask
-		request.Type = helper.String(DDOS_BLACK_TYPE)
-		_, err = me.client.UseAntiddosClient().CreateDDoSBlackWhiteIpList(request)
-		if e, ok := err.(*errors.TencentCloudSDKError); ok {
-			if e.GetCode() == "InternalError.ClusterNotFound" {
-				return nil
+	if len(blackIpsWithMask) > 0 {
+		err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
+			request := antiddos.NewCreateDDoSBlackWhiteIpListRequest()
+			ratelimit.Check(request.GetAction())
+			request.InstanceId = helper.String(instanceId)
+			request.IpList = blackIpsWithMask
+			request.Type = helper.String(DDOS_BLACK_TYPE)
+			_, err = me.client.UseAntiddosClient().CreateDDoSBlackWhiteIpList(request)
+			if e, ok := err.(*errors.TencentCloudSDKError); ok {
+				if e.GetCode() == "InternalError.ClusterNotFound" {
+					return nil
+				}
 			}
-		}
-		if err != nil {
-			return resource.RetryableError(err)
-		}
-		return nil
-	})
+			if err != nil {
+				return resource.RetryableError(err)
+			}
+			return nil
+		})
 
-	if err != nil {
-		return
+		if err != nil {
+			return
+		}
 	}
-	err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
-		request := antiddos.NewCreateDDoSBlackWhiteIpListRequest()
-		ratelimit.Check(request.GetAction())
-		request.InstanceId = helper.String(instanceId)
-		request.IpList = whiteIpsWithMask
-		request.Type = helper.String(DDOS_WHITE_TYPE)
-		_, err = me.client.UseAntiddosClient().CreateDDoSBlackWhiteIpList(request)
-		if e, ok := err.(*errors.TencentCloudSDKError); ok {
-			if e.GetCode() == "InternalError.ClusterNotFound" {
-				return nil
+	if len(whiteIpsWithMask) > 0 {
+		err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
+			request := antiddos.NewCreateDDoSBlackWhiteIpListRequest()
+			ratelimit.Check(request.GetAction())
+			request.InstanceId = helper.String(instanceId)
+			request.IpList = whiteIpsWithMask
+			request.Type = helper.String(DDOS_WHITE_TYPE)
+			_, err = me.client.UseAntiddosClient().CreateDDoSBlackWhiteIpList(request)
+			if e, ok := err.(*errors.TencentCloudSDKError); ok {
+				if e.GetCode() == "InternalError.ClusterNotFound" {
+					return nil
+				}
+			}
+			if err != nil {
+				return resource.RetryableError(err)
+			}
+			return nil
+		})
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (me *AntiddosService) DescribeListPortAclList(instanceId string) (result []*antiddos.AclConfigRelation, err error) {
+	request := antiddos.NewDescribeListPortAclListRequest()
+	offset := uint64(0)
+	request.Offset = &offset
+	result = make([]*antiddos.AclConfigRelation, 0)
+	limit := uint64(DDOS_DESCRIBE_LIMIT)
+	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
+	var response *antiddos.DescribeListPortAclListResponse
+	for {
+		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
+			response, err = me.client.UseAntiddosClient().DescribeListPortAclList(request)
+			if e, ok := err.(*errors.TencentCloudSDKError); ok {
+				if e.GetCode() == "InternalError.ClusterNotFound" {
+					return nil
+				}
+			}
+			if err != nil {
+				return resource.RetryableError(err)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("[CRITAL] read ddos acl list failed, reason:%s\n", err.Error())
+			return
+		} else {
+			result = append(result, response.Response.AclList...)
+			if len(response.Response.AclList) < DDOS_DESCRIBE_LIMIT {
+				break
+			} else {
+				offset = offset + limit
 			}
 		}
-		if err != nil {
-			return resource.RetryableError(err)
-		}
-		return nil
-	})
-	if err != nil {
-		return
 	}
 	return
 }
@@ -112,13 +154,13 @@ func (me *AntiddosService) CreatePortAcl(ctx context.Context, instanceId string,
 	logId := getLogId(ctx)
 	for _, vv := range mapping {
 		v := vv.(map[string]interface{})
-		dStartPort := v["d_start_port"].(uint64)
-		dEndPort := v["d_end_port"].(uint64)
-		sStartPort := v["s_start_port"].(uint64)
-		sEndPort := v["s_end_port"].(uint64)
-		protocol := v["kind"].(string)
+		dStartPort := uint64(v["d_start_port"].(int))
+		dEndPort := uint64(v["d_end_port"].(int))
+		sStartPort := uint64(v["s_start_port"].(int))
+		sEndPort := uint64(v["s_end_port"].(int))
+		protocol := v["protocol"].(string)
 		action := v["action"].(string)
-		priority := v["priority"].(uint64)
+		priority := uint64(v["priority"].(int))
 		if dStartPort > dEndPort {
 			err = fmt.Errorf("The `dStartPort` should not be greater than `dEndPort`.")
 			return
@@ -204,20 +246,23 @@ func (me *AntiddosService) CreateDropOption(ctx context.Context, instanceId stri
 
 func (me *AntiddosService) CreatePacketFilter(ctx context.Context, instanceId string, mapping []interface{}) (err error) {
 	logId := getLogId(ctx)
+	if len(mapping) == 0 {
+		return
+	}
 	for _, vv := range mapping {
 		v := vv.(map[string]interface{})
 		protocol := v["protocol"].(string)
-		dStartPort := v["d_start_port"].(int64)
-		dEndPort := v["d_end_port"].(int64)
-		sStartPort := v["s_start_port"].(int64)
-		sEndPort := v["s_end_port"].(int64)
-		pktLengthMin := v["pkt_length_min"].(int64)
-		pktLengthMax := v["pkt_length_max"].(int64)
+		dStartPort := int64(v["d_start_port"].(int))
+		dEndPort := int64(v["d_end_port"].(int))
+		sStartPort := int64(v["s_start_port"].(int))
+		sEndPort := int64(v["s_end_port"].(int))
+		pktLengthMin := int64(v["pkt_length_min"].(int))
+		pktLengthMax := int64(v["pkt_length_max"].(int))
 		matchBegin := v["match_begin"].(string)
 		matchType := v["match_type"].(string)
 		matchStr := v["match_str"].(string)
-		depth := v["depth"].(int64)
-		offset := v["offset"].(int64)
+		depth := int64(v["depth"].(int))
+		offset := int64(v["offset"].(int))
 		isInclude := v["is_include"].(bool)
 		action := v["action"].(string)
 
@@ -270,6 +315,7 @@ func (me *AntiddosService) DescribeListPacketFilterConfig(instanceId string) (re
 	result = make([]*antiddos.PacketFilterRelation, 0)
 	limit := int64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListPacketFilterConfigResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -302,6 +348,9 @@ func (me *AntiddosService) DescribeListPacketFilterConfig(instanceId string) (re
 func (me *AntiddosService) CreateAIProtection(ctx context.Context, instanceId string, ddosAiSwitch string) (err error) {
 	logId := getLogId(ctx)
 
+	if len(ddosAiSwitch) <= 0 {
+		return
+	}
 	var request *antiddos.CreateDDoSAIRequest
 	err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
 		request = antiddos.NewCreateDDoSAIRequest()
@@ -335,6 +384,7 @@ func (me *AntiddosService) DescribeListDDoSAI(instanceId string) (result []*anti
 	result = make([]*antiddos.DDoSAIRelation, 0)
 	limit := int64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListDDoSAIResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -366,17 +416,20 @@ func (me *AntiddosService) DescribeListDDoSAI(instanceId string) (result []*anti
 
 func (me *AntiddosService) CreateDDoSSpeedLimitConfig(ctx context.Context, instanceId string, mapping []interface{}) (err error) {
 	logId := getLogId(ctx)
+	if len(mapping) == 0 {
+		return
+	}
 	for _, vv := range mapping {
 		v := vv.(map[string]interface{})
 		speedValues := v["speed_values"].([]interface{})
 		speedValueList := make([]*antiddos.SpeedValue, 0)
 		for _, speedValue := range speedValues {
 			speedValueMap := speedValue.(map[string]interface{})
-			speedValueType := speedValueMap["type"].(uint64)
-			speedValueValue := speedValueMap["value"].(uint64)
+			speedValueType := uint64(speedValueMap["type"].(int))
+			speedValueValue := uint64(speedValueMap["value"].(int))
 			speedValueList = append(speedValueList, &antiddos.SpeedValue{Type: &speedValueType, Value: &speedValueValue})
 		}
-		mode := v["mode"].(uint64)
+		mode := uint64(v["mode"].(int))
 		protocolList := v["protocol_list"].(string)
 		dstPortList := v["dst_port_list"].(string)
 
@@ -419,6 +472,7 @@ func (me *AntiddosService) DescribeListDDoSSpeedLimitConfig(instanceId string) (
 	result = make([]*antiddos.DDoSSpeedLimitConfigRelation, 0)
 	limit := uint64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListDDoSSpeedLimitConfigResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -450,11 +504,14 @@ func (me *AntiddosService) DescribeListDDoSSpeedLimitConfig(instanceId string) (
 
 func (me *AntiddosService) CreateDDoSGeoIPBlockConfig(ctx context.Context, instanceId string, mapping []interface{}) (err error) {
 	logId := getLogId(ctx)
+	if len(mapping) == 0 {
+		return
+	}
 	for _, vv := range mapping {
 		v := vv.(map[string]interface{})
-		regionType := v["RegionType"].(string)
-		action := v["Action"].(string)
-		areaList := v["AreaList"].([]int64)
+		regionType := v["region_type"].(string)
+		action := v["action"].(string)
+		areaList := v["area_list"].([]interface{})
 		var request *antiddos.CreateDDoSGeoIPBlockConfigRequest
 		err = resource.Retry(writeRetryTimeout, func() *resource.RetryError {
 			request := antiddos.NewCreateDDoSGeoIPBlockConfigRequest()
@@ -469,7 +526,11 @@ func (me *AntiddosService) CreateDDoSGeoIPBlockConfig(ctx context.Context, insta
 					err := fmt.Errorf("When regionType is `customized`, must set area_list.")
 					return retryError(err)
 				}
-				request.DDoSGeoIPBlockConfig.AreaList = common.Int64Ptrs(areaList)
+				areaListInt64 := make([]int64, 0)
+				for _, area := range areaList {
+					areaListInt64 = append(areaListInt64, int64(area.(int)))
+				}
+				request.DDoSGeoIPBlockConfig.AreaList = common.Int64Ptrs(areaListInt64)
 			}
 
 			_, err = me.client.UseAntiddosClient().CreateDDoSGeoIPBlockConfig(request)
@@ -499,6 +560,7 @@ func (me *AntiddosService) DescribeListDDoSGeoIPBlockConfig(instanceId string) (
 	result = make([]*antiddos.DDoSGeoIPBlockConfigRelation, 0)
 	limit := uint64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListDDoSGeoIPBlockConfigResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -535,6 +597,7 @@ func (me *AntiddosService) DescribeListProtocolBlockConfig(instanceId string) (r
 	result = make([]*antiddos.ProtocolBlockRelation, 0)
 	limit := int64(DDOS_DESCRIBE_LIMIT)
 	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
 	var response *antiddos.DescribeListProtocolBlockConfigResponse
 	for {
 		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
@@ -551,6 +614,43 @@ func (me *AntiddosService) DescribeListProtocolBlockConfig(instanceId string) (r
 		})
 		if err != nil {
 			log.Printf("[CRITAL] read ddos blackwhile list failed, reason:%s\n", err.Error())
+			return
+		} else {
+			result = append(result, response.Response.ConfigList...)
+			if len(response.Response.ConfigList) < DDOS_DESCRIBE_LIMIT {
+				break
+			} else {
+				offset = offset + limit
+			}
+		}
+	}
+	return
+}
+
+func (me *AntiddosService) DescribeDDoSConnectLimitList(instanceId string) (result []*antiddos.ConnectLimitRelation, err error) {
+	request := antiddos.NewDescribeDDoSConnectLimitListRequest()
+	offset := uint64(0)
+	request.Offset = &offset
+	result = make([]*antiddos.ConnectLimitRelation, 0)
+	limit := uint64(DDOS_DESCRIBE_LIMIT)
+	request.Limit = &limit
+	request.FilterInstanceId = &instanceId
+	var response *antiddos.DescribeDDoSConnectLimitListResponse
+	for {
+		err = resource.Retry(readRetryTimeout, func() *resource.RetryError {
+			response, err = me.client.UseAntiddosClient().DescribeDDoSConnectLimitList(request)
+			if e, ok := err.(*errors.TencentCloudSDKError); ok {
+				if e.GetCode() == "InternalError.ClusterNotFound" {
+					return nil
+				}
+			}
+			if err != nil {
+				return resource.RetryableError(err)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("[CRITAL] read ddos connect limit list failed, reason:%s\n", err.Error())
 			return
 		} else {
 			result = append(result, response.Response.ConfigList...)
