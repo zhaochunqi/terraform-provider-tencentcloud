@@ -1816,7 +1816,7 @@ func (me *GaapService) DescribeHTTPListeners(
 				count = 0
 
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
 						return nil
 					}
 				}
@@ -1881,7 +1881,7 @@ func (me *GaapService) DescribeHTTPSListeners(
 				count = 0
 
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
 						return nil
 					}
 				}
@@ -2033,7 +2033,7 @@ func (me *GaapService) DeleteLayer7Listener(ctx context.Context, id, proxyId, pr
 			response, err := client.DescribeHTTPListeners(describeRequest)
 			if err != nil {
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == fmt.Sprintf("ListenerId(%s) Not Exist.", id)) {
 						return nil
 					}
 				}
@@ -2067,7 +2067,7 @@ func (me *GaapService) DeleteLayer7Listener(ctx context.Context, id, proxyId, pr
 			response, err := client.DescribeHTTPSListeners(describeRequest)
 			if err != nil {
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == fmt.Sprintf("ListenerId(%s) Not Exist.", id)) {
 						return nil
 					}
 				}
@@ -2203,6 +2203,12 @@ func waitLayer7ListenerReady(ctx context.Context, client *gaap.Client, proxyId, 
 
 			response, err := client.DescribeHTTPListeners(request)
 			if err != nil {
+				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == fmt.Sprintf("ListenerId(%s) Not Exist.", id)) {
+						return nil
+					}
+				}
+
 				log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 					logId, request.GetAction(), request.ToJsonString(), err)
 				return retryError(err)
@@ -2248,6 +2254,11 @@ func waitLayer7ListenerReady(ctx context.Context, client *gaap.Client, proxyId, 
 
 			response, err := client.DescribeHTTPSListeners(request)
 			if err != nil {
+				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == fmt.Sprintf("ListenerId(%s) Not Exist.", id)) {
+						return nil
+					}
+				}
 				log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 					logId, request.GetAction(), request.ToJsonString(), err)
 				return retryError(err)

@@ -10,7 +10,7 @@ import (
 func TestAccDataSourceTencentCloudGaapHttpRules_basic(t *testing.T) {
 	t.Parallel()
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
+		PreCheck:  func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
@@ -40,7 +40,7 @@ func TestAccDataSourceTencentCloudGaapHttpRules_basic(t *testing.T) {
 func TestAccDataSourceTencentCloudGaapHttpRules_path(t *testing.T) {
 	t.Parallel()
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
+		PreCheck:  func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
@@ -70,7 +70,7 @@ func TestAccDataSourceTencentCloudGaapHttpRules_path(t *testing.T) {
 func TestAccDataSourceTencentCloudGaapHttpRules_forwardHost(t *testing.T) {
 	t.Parallel()
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
+		PreCheck:  func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers: testAccProviders,
 		Steps: []resource.TestStep{
 			{
