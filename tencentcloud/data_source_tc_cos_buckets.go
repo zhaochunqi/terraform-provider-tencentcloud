@@ -318,6 +318,17 @@ LOOP:
 			continue
 		}
 
+		respTags, err := cosService.GetBucketTags(ctx, *v.Name)
+		if err != nil {
+			return err
+		}
+
+		for k, v := range tags {
+			if respTags[k] != v {
+				continue LOOP
+			}
+		}
+
 		bucket["bucket"] = *v.Name
 
 		corsRules, err := cosService.GetBucketCors(ctx, *v.Name)
@@ -354,17 +365,6 @@ LOOP:
 			return err
 		}
 		bucket["acl_body"] = aclBody
-
-		respTags, err := cosService.GetBucketTags(ctx, *v.Name)
-		if err != nil {
-			return err
-		}
-
-		for k, v := range tags {
-			if respTags[k] != v {
-				continue LOOP
-			}
-		}
 
 		bucket["tags"] = respTags
 		bucket["cos_bucket_url"] = fmt.Sprintf("%s.cos.%s.myqcloud.com", *v.Name, meta.(*TencentCloudClient).apiV3Conn.Region)
