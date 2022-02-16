@@ -44,7 +44,7 @@ func TestAccTencentCloudGaapHttpDomain_basic(t *testing.T) {
 	})
 }
 
-func TestAccTencentCloudGaapHttpDomain_https(t *testing.T) {
+func TestAccTencentCloudGaapHttpDomain_https_basic(t *testing.T) {
 	t.Parallel()
 	id := new(string)
 
