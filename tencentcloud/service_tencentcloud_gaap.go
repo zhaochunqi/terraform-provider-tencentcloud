@@ -1014,7 +1014,7 @@ func (me *GaapService) DescribeTCPListeners(ctx context.Context, proxyId, listen
 				count = 0
 
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
 						return nil
 					}
 				}
@@ -1075,7 +1075,7 @@ func (me *GaapService) DescribeUDPListeners(ctx context.Context, proxyId, id, na
 				count = 0
 
 				if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && sdkError.Message == "ListenerId") {
+					if sdkError.Code == GAAPResourceNotFound || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
 						return nil
 					}
 				}
@@ -1358,6 +1358,11 @@ func (me *GaapService) EnableSecurityPolicy(ctx context.Context, proxyId, policy
 
 		response, err := client.DescribeSecurityPolicyDetail(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "PolicyId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err)
@@ -1413,6 +1418,11 @@ func (me *GaapService) DisableSecurityPolicy(ctx context.Context, proxyId, polic
 
 		response, err := client.DescribeSecurityPolicyDetail(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "PolicyId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err)
@@ -1451,7 +1461,7 @@ func (me *GaapService) DescribeSecurityPolicy(ctx context.Context, id string) (p
 		response, err := me.client.UseGaapClient().DescribeSecurityPolicyDetail(request)
 		if err != nil {
 			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-				if sdkError.Code == "ResourceNotFound" {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "PolicyId")) {
 					return nil
 				}
 			}
@@ -1523,7 +1533,7 @@ func (me *GaapService) DeleteSecurityPolicy(ctx context.Context, id string) erro
 		_, err := client.DescribeSecurityPolicyDetail(describeRequest)
 		if err != nil {
 			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-				if sdkError.Code == "ResourceNotFound" {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "PolicyId")) {
 					return nil
 				}
 			}
@@ -1605,7 +1615,7 @@ func (me *GaapService) DescribeSecurityRule(ctx context.Context, id string) (sec
 		response, err := me.client.UseGaapClient().DescribeSecurityRules(request)
 		if err != nil {
 			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-				if sdkError.Code == "ResourceNotFound" {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "SecurityRuleId")) {
 					return nil
 				}
 			}
@@ -2328,6 +2338,11 @@ func (me *GaapService) CreateHTTPDomain(ctx context.Context, listenerId, domain 
 
 		response, err := client.DescribeRules(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err)
@@ -2395,6 +2410,11 @@ func (me *GaapService) CreateHTTPSDomain(
 
 		response, err := client.DescribeRules(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err)
@@ -2492,6 +2512,11 @@ func (me *GaapService) DescribeDomain(ctx context.Context, listenerId, domain st
 
 		response, err := me.client.UseGaapClient().DescribeRules(request)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, request.GetAction(), request.ToJsonString(), err)
 			return retryError(err)
@@ -2583,6 +2608,11 @@ func (me *GaapService) DeleteDomain(ctx context.Context, listenerId, domain stri
 
 		response, err := client.DescribeRules(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err, GAAPInternalError)
@@ -2722,7 +2752,7 @@ func (me *GaapService) DescribeHttpRule(ctx context.Context, id string) (rule *g
 		response, err := me.client.UseGaapClient().DescribeRulesByRuleIds(request)
 		if err != nil {
 			if sdkErr, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-				if sdkErr.Code == GAAPResourceNotFound {
+				if sdkErr.Code == GAAPResourceNotFound || (sdkErr.Code == "InvalidParameter" && strings.Contains(sdkErr.Message, "ruleId")) {
 					return nil
 				}
 			}
@@ -2828,6 +2858,11 @@ func (me *GaapService) DeleteHttpRule(ctx context.Context, listenerId, ruleId st
 
 		response, err := client.DescribeRules(describeRequest)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, describeRequest.GetAction(), describeRequest.ToJsonString(), err)
 			return retryError(err, GAAPInternalError)
@@ -2869,6 +2904,11 @@ func waitHttpRuleReady(ctx context.Context, client *gaap.Client, listenerId, rul
 
 		response, err := client.DescribeRules(request)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, request.GetAction(), request.ToJsonString(), err)
 			return retryError(err)
@@ -2916,6 +2956,11 @@ func (me *GaapService) DescribeDomains(ctx context.Context, listenerId, domain s
 
 		response, err := me.client.UseGaapClient().DescribeRules(request)
 		if err != nil {
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
+			}
 			log.Printf("[CRITAL]%s api[%s] fail, request body [%s], reason[%s]",
 				logId, request.GetAction(), request.ToJsonString(), err)
 			return retryError(err)
@@ -2954,7 +2999,7 @@ func (me *GaapService) DescribeSecurityRules(ctx context.Context, policyId strin
 		response, err := me.client.UseGaapClient().DescribeSecurityPolicyDetail(request)
 		if err != nil {
 			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
-				if sdkError.Code == "ResourceNotFound" {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "PolicyId")) {
 					return nil
 				}
 			}
@@ -3145,8 +3190,10 @@ func (me *GaapService) DescribeDomainErrorPageInfo(ctx context.Context, listener
 	if err := resource.Retry(readRetryTimeout, func() *resource.RetryError {
 		resp, err := client.DescribeDomainErrorPageInfo(request)
 		if err != nil {
-			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok && sdkError.Code == "ResourceNotFound" {
-				return nil
+			if sdkError, ok := err.(*sdkErrors.TencentCloudSDKError); ok {
+				if sdkError.Code == "ResourceNotFound" || (sdkError.Code == "InvalidParameter" && strings.Contains(sdkError.Message, "ListenerId")) {
+					return nil
+				}
 			}
 
 			return retryError(err)

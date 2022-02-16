@@ -17,7 +17,7 @@ func TestAccTencentCloudGaapHttpDomain_basic(t *testing.T) {
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -49,7 +49,7 @@ func TestAccTencentCloudGaapHttpDomain_https(t *testing.T) {
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -81,7 +81,7 @@ func TestAccTencentCloudGaapHttpDomain_httpsMutualAuthentication(t *testing.T) {
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -124,7 +124,7 @@ func TestAccTencentCloudGaapHttpDomain_httpsPolyClientCertificateIds(t *testing.
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -159,7 +159,7 @@ func TestAccTencentCloudGaapHttpDomain_httpsCCIdToPolyIds(t *testing.T) {
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -195,7 +195,7 @@ func TestAccTencentCloudGaapHttpDomain_httpsRealserverCertificateIdOldToNew(t *t
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
@@ -240,7 +240,7 @@ func TestAccTencentCloudGaapHttpDomain_httpsRealserverCertificateIds(t *testing.
 	id := new(string)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
+		PreCheck:     func() { testAccPreCheckCommon(t, ACCOUNT_TYPE_PREPAY) },
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGaapHttpDomainDestroy(id),
 		Steps: []resource.TestStep{
