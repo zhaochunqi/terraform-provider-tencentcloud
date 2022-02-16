@@ -110,9 +110,14 @@ resource "tencentcloud_gaap_realserver" "foo" {
   name = "ci-test-gaap-realserver"
 }
 
-resource tencentcloud_gaap_http_rule "foo" {
+resource "tencentcloud_gaap_http_domain" "foo" {
+	listener_id = tencentcloud_gaap_layer7_listener.foo.id
+	domain      = "www.qq.com"
+}
+
+resource "tencentcloud_gaap_http_rule" "foo" {
   listener_id     = tencentcloud_gaap_layer7_listener.foo.id
-  domain          = "www.qq.com"
+  domain          = tencentcloud_gaap_http_domain.foo.domain
   path            = "/"
   realserver_type = "IP"
   health_check    = true
