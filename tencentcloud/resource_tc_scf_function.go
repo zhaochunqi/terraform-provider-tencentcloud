@@ -101,12 +101,18 @@ func resourceTencentCloudScfFunction() *schema.Resource {
 			},
 			"handler": {
 				Type:     schema.TypeString,
-				Required: true,
-				ValidateFunc: helper.ComposeValidateFunc(
-					validateStringLengthInRange(2, 60),
-					scfFunctionValidate(true),
-				),
+				Optional: true,
+				// ValidateFunc: helper.ComposeValidateFunc(
+				// 	validateStringLengthInRange(2, 60),
+				// 	scfFunctionValidate(true),
+				// ),
 				Description: "Handler of the SCF function. The format of name is `<filename>.<method_name>`, and it supports 26 English letters, numbers, connectors, and underscores, it should start with a letter. The last character cannot be `-` or `_`. Available length is 2-60.",
+			},
+			"type": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "Event",
+				Description: "函数类型，默认值为Event，创建触发器函数请填写Event，创建HTTP函数级服务请填写HTTP",
 			},
 			"description": {
 				Type:         schema.TypeString,
@@ -144,7 +150,7 @@ func resourceTencentCloudScfFunction() *schema.Resource {
 			},
 			"runtime": {
 				Type:        schema.TypeString,
-				Required:    true,
+				Optional:    true,
 				Description: "Runtime of the SCF function, only supports `Python2.7`, `Python3.6`, `Nodejs6.10`, `Nodejs8.9`, `Nodejs10.15`, `PHP5`, `PHP7`, `Golang1`, and `Java8`.",
 			},
 			"vpc_id": {
@@ -451,6 +457,7 @@ func resourceTencentCloudScfFunctionCreate(d *schema.ResourceData, m interface{}
 
 	functionInfo.name = d.Get("name").(string)
 	functionInfo.handler = helper.String(d.Get("handler").(string))
+	functionInfo.scfType = helper.String(d.Get("type").(string))
 	functionInfo.desc = helper.String(d.Get("description").(string))
 	functionInfo.memSize = helper.Int(d.Get("mem_size").(int))
 	functionInfo.timeout = helper.Int(d.Get("timeout").(int))

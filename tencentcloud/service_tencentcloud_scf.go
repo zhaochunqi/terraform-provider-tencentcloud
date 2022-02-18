@@ -16,6 +16,7 @@ import (
 type scfFunctionInfo struct {
 	name            string
 	handler         *string
+	scfType         *string
 	desc            *string
 	memSize         *int
 	timeout         *int
@@ -55,6 +56,7 @@ func (me *ScfService) CreateFunction(ctx context.Context, info scfFunctionInfo) 
 
 	request := scf.NewCreateFunctionRequest()
 	request.FunctionName = &info.name
+	request.Type = info.scfType
 	request.Handler = info.handler
 	request.Description = info.desc
 	request.MemorySize = helper.IntInt64(*info.memSize)
@@ -83,7 +85,6 @@ func (me *ScfService) CreateFunction(ctx context.Context, info scfFunctionInfo) 
 	request.ClsLogsetId = info.clsLogsetId
 	request.ClsTopicId = info.clsTopicId
 	request.Layers = info.layers
-	request.Type = helper.String(SCF_FUNCTION_TYPE_EVENT)
 
 	request.Code = &scf.Code{
 		CosBucketName:   info.cosBucketName,
