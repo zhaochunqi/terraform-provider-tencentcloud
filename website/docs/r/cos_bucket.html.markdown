@@ -37,7 +37,8 @@ Using verbose acl
 
 ```hcl
 resource "tencentcloud_cos_bucket" "with_acl_body" {
-  bucket   = "mycos-1258798060"
+  bucket = "mycos-1258798060"
+  # NOTE: Granting http://cam.qcloud.com/groups/global/AllUsers `READ` Permission is equivalent to "public-read" acl
   acl_body = <<EOF
 <AccessControlPolicy>
     <Owner>
@@ -53,12 +54,14 @@ resource "tencentcloud_cos_bucket" "with_acl_body" {
         <Grant>
             <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
                 <ID>qcs::cam::uin/100000000001:uin/100000000001</ID>
+                <DisplayName>qcs::cam::uin/100000000001:uin/100000000001</DisplayName>
             </Grantee>
             <Permission>WRITE</Permission>
         </Grant>
         <Grant>
             <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
                 <ID>qcs::cam::uin/100000000001:uin/100000000001</ID>
+                <DisplayName>qcs::cam::uin/100000000001:uin/100000000001</DisplayName>
             </Grantee>
             <Permission>READ_ACP</Permission>
         </Grant>
@@ -234,7 +237,7 @@ resource "tencentcloud_cos_bucket" "mycos" {
 The following arguments are supported:
 
 * `bucket` - (Required, ForceNew) The name of a bucket to be created. Bucket format should be [custom name]-[appid], for example `mycos-1258798060`.
-* `acl_body` - (Optional) ACL XML body for multiple grant info.
+* `acl_body` - (Optional) ACL XML body for multiple grant info. NOTE: this argument will overwrite `acl`. Check https://intl.cloud.tencent.com/document/product/436/7737 for more detail.
 * `acl` - (Optional) The canned ACL to apply. Valid values: private, public-read, and public-read-write. Defaults to private.
 * `cors_rules` - (Optional) A rule of Cross-Origin Resource Sharing (documented below).
 * `encryption_algorithm` - (Optional) The server-side encryption algorithm to use. Valid value is `AES256`.
@@ -242,7 +245,7 @@ The following arguments are supported:
 * `log_enable` - (Optional) Indicate the access log of this bucket to be saved or not. Default is `false`. If set `true`, the access log will be saved with `log_target_bucket`. To enable log, the full access of log service must be granted. [Full Access Role Policy](https://intl.cloud.tencent.com/document/product/436/16920).
 * `log_prefix` - (Optional) The prefix log name which saves the access log of this bucket per 5 minutes. Eg. `MyLogPrefix/`. The log access file format is `log_target_bucket`/`log_prefix`{YYYY}/{MM}/{DD}/{time}_{random}_{index}.gz. Only valid when `log_enable` is `true`.
 * `log_target_bucket` - (Optional) The target bucket name which saves the access log of this bucket per 5 minutes. The log access file format is `log_target_bucket`/`log_prefix`{YYYY}/{MM}/{DD}/{time}_{random}_{index}.gz. Only valid when `log_enable` is `true`. User must have full access on this bucket.
-* `multi_az` - (Optional, ForceNew) Indicates whether to create a bucket of multi available zone.
+* `multi_az` - (Optional, ForceNew) Indicates whether to create a bucket of multi available zone. NOTE: If set to true, the versioning must enable.
 * `origin_domain_rules` - (Optional) Bucket Origin Domain settings.
 * `origin_pull_rules` - (Optional) Bucket Origin-Pull settings.
 * `replica_role` - (Optional) Request initiator identifier, format: `qcs::cam::uin/<owneruin>:uin/<subuin>`. NOTE: only `versioning_enable` is true can configure this argument.
@@ -268,7 +271,19 @@ The `lifecycle_rules` object supports the following:
 
 * `filter_prefix` - (Required) Object key prefix identifying one or more objects to which the rule applies.
 * `expiration` - (Optional) Specifies a period in the object's expire (documented below).
+* `id` - (Optional) A unique identifier for the rule. It can be up to 255 characters.
+* `non_current_expiration` - (Optional) Specifies when non current object versions shall expire.
+* `non_current_transition` - (Optional) Specifies a period in the non current object's transitions.
 * `transition` - (Optional) Specifies a period in the object's transitions (documented below).
+
+The `non_current_expiration` object supports the following:
+
+* `non_current_days` - (Optional) Number of days after non current object creation when the specific rule action takes effect. The maximum value is 3650.
+
+The `non_current_transition` object supports the following:
+
+* `storage_class` - (Required) Specifies the storage class to which you want the non current object to transition. Available values include `STANDARD`, `STANDARD_IA` and `ARCHIVE`.
+* `non_current_days` - (Optional) Number of days after non current object creation when the specific rule action takes effect.
 
 The `origin_domain_rules` object supports the following:
 

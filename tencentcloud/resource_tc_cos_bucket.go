@@ -28,6 +28,7 @@ Using verbose acl
 ```hcl
 resource "tencentcloud_cos_bucket" "with_acl_body" {
   bucket = "mycos-1258798060"
+  # NOTE: Granting http://cam.qcloud.com/groups/global/AllUsers `READ` Permission is equivalent to "public-read" acl
   acl_body = <<EOF
 <AccessControlPolicy>
     <Owner>
@@ -43,12 +44,14 @@ resource "tencentcloud_cos_bucket" "with_acl_body" {
         <Grant>
             <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
                 <ID>qcs::cam::uin/100000000001:uin/100000000001</ID>
+                <DisplayName>qcs::cam::uin/100000000001:uin/100000000001</DisplayName>
             </Grantee>
             <Permission>WRITE</Permission>
         </Grant>
         <Grant>
             <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser">
                 <ID>qcs::cam::uin/100000000001:uin/100000000001</ID>
+                <DisplayName>qcs::cam::uin/100000000001:uin/100000000001</DisplayName>
             </Grantee>
             <Permission>READ_ACP</Permission>
         </Grant>
@@ -233,14 +236,15 @@ package tencentcloud
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"log"
+	"reflect"
 	"time"
 
 	"github.com/tencentyun/cos-go-sdk-v5"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/hashcode"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -404,9 +408,24 @@ func resourceTencentCloudCosBucket() *schema.Resource {
 				Description: "The canned ACL to apply. Valid values: private, public-read, and public-read-write. Defaults to private.",
 			},
 			"acl_body": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "ACL XML body for multiple grant info.",
+				Type:     schema.TypeString,
+				Optional: true,
+
+				DiffSuppressFunc: func(k, olds, news string, d *schema.ResourceData) bool {
+					var oldXML cos.BucketGetACLResult
+					err := xml.Unmarshal([]byte(olds), &oldXML)
+					if err != nil {
+						return olds == news
+					}
+					var newXML cos.BucketGetACLResult
+					err = xml.Unmarshal([]byte(news), &newXML)
+					if err != nil {
+						return olds == news
+					}
+					suppress := reflect.DeepEqual(oldXML, newXML)
+					return suppress
+				},
+				Description: "ACL XML body for multiple grant info. NOTE: this argument will overwrite `acl`. Check https://intl.cloud.tencent.com/document/product/436/7737 for more detail.",
 			},
 			"encryption_algorithm": {
 				Type:        schema.TypeString,
@@ -542,6 +561,11 @@ func resourceTencentCloudCosBucket() *schema.Resource {
 				Description: "A configuration of object lifecycle management (documented below).",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "A unique identifier for the rule. It can be up to 255 characters.",
+						},
 						"filter_prefix": {
 							Type:        schema.TypeString,
 							Required:    true,
@@ -598,6 +622,45 @@ func resourceTencentCloudCosBucket() *schema.Resource {
 								},
 							},
 						},
+						"non_current_transition": {
+							Type:        schema.TypeSet,
+							Optional:    true,
+							Set:         nonCurrentTransitionHash,
+							Description: "Specifies a period in the non current object's transitions.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"non_current_days": {
+										Type:         schema.TypeInt,
+										Optional:     true,
+										ValidateFunc: validateIntegerMin(0),
+										Description:  "Number of days after non current object creation when the specific rule action takes effect.",
+									},
+									"storage_class": {
+										Type:         schema.TypeString,
+										Required:     true,
+										ValidateFunc: validateAllowedStringValue(availableCosStorageClass),
+										Description:  "Specifies the storage class to which you want the non current object to transition. Available values include `STANDARD`, `STANDARD_IA` and `ARCHIVE`.",
+									},
+								},
+							},
+						},
+						"non_current_expiration": {
+							Type:        schema.TypeSet,
+							Optional:    true,
+							Set:         nonCurrentExpirationHash,
+							MaxItems:    1,
+							Description: "Specifies when non current object versions shall expire.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"non_current_days": {
+										Type:         schema.TypeInt,
+										Optional:     true,
+										ValidateFunc: validateIntegerMin(0),
+										Description:  "Number of days after non current object creation when the specific rule action takes effect. The maximum value is 3650.",
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -648,7 +711,7 @@ func resourceTencentCloudCosBucket() *schema.Resource {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				ForceNew:    true,
-				Description: "Indicates whether to create a bucket of multi available zone.",
+				Description: "Indicates whether to create a bucket of multi available zone. NOTE: If set to true, the versioning must enable.",
 			},
 			//computed
 			"cos_bucket_url": {
@@ -672,13 +735,17 @@ func resourceTencentCloudCosBucketCreate(d *schema.ResourceData, meta interface{
 	acl := d.Get("acl").(string)
 	role, roleOk := d.GetOk("replica_role")
 	rule, ruleOk := d.GetOk("replica_rules")
-	versioning, versioningOk := d.GetOk("versioning_enable")
+	versioning := d.Get("versioning_enable").(bool)
+	isMAZ := d.Get("multi_az").(bool)
 
-	if v := versioning.(bool); !versioningOk || !v {
+	if !versioning {
 		if roleOk || role.(string) != "" {
 			return fmt.Errorf("cannot configure role unless versioning enable")
 		} else if ruleOk || len(rule.([]interface{})) > 0 {
 			return fmt.Errorf("cannot configure replica rule unless versioning enable")
+		}
+		if isMAZ {
+			return fmt.Errorf("cannot create MAZ bucket unless versioning enable")
 		}
 	}
 
@@ -716,15 +783,19 @@ func resourceTencentCloudCosBucketRead(d *schema.ResourceData, meta interface{})
 	bucket := d.Id()
 	cosService := CosService{client: meta.(*TencentCloudClient).apiV3Conn}
 
-	err := cosService.HeadBucket(ctx, bucket)
+	code, header, err := cosService.TencentcloudHeadBucket(ctx, bucket)
 	if err != nil {
-		if awsError, ok := err.(awserr.RequestFailure); ok && awsError.StatusCode() == 404 {
+		if code == 404 {
 			log.Printf("[WARN]%s bucket (%s) not found, error code (404)", logId, bucket)
 			d.SetId("")
 			return nil
 		} else {
 			return err
 		}
+	}
+
+	if header != nil && len(header["X-Cos-Bucket-Az-Type"]) > 0 && header["X-Cos-Bucket-Az-Type"][0] == "MAZ" {
+		_ = d.Set("multi_az", true)
 	}
 
 	cosBucketUrl := fmt.Sprintf("%s.cos.%s.myqcloud.com", d.Id(), meta.(*TencentCloudClient).apiV3Conn.Region)
@@ -737,6 +808,26 @@ func resourceTencentCloudCosBucketRead(d *schema.ResourceData, meta interface{})
 	if err != nil {
 		return err
 	}
+
+	// acl
+	aclResult, err := cosService.GetBucketACL(ctx, bucket)
+
+	if err != nil {
+		return err
+	}
+
+	aclBody, err := xml.Marshal(aclResult)
+
+	if err != nil {
+		log.Printf("[WARN] Marshal XML Error: %s", err.Error())
+	} else if v, ok := d.Get("acl_body").(string); ok && v != "" {
+		_ = d.Set("acl_body", string(aclBody))
+	}
+
+	acl := GetBucketPublicACL(aclResult)
+
+	_ = d.Set("acl", acl)
+
 	// read the cors
 	corsRules, err := cosService.GetBucketCors(ctx, bucket)
 	if err != nil {
@@ -1245,6 +1336,37 @@ func resourceTencentCloudCosBucketLifecycleUpdate(ctx context.Context, client *s
 
 				rule.Expiration = e
 			}
+
+			// Non Current Transitions
+			nonCurrentTransitions := d.Get(fmt.Sprintf("lifecycle_rules.%d.non_current_transition", i)).(*schema.Set).List()
+			if len(nonCurrentTransitions) > 0 {
+				rule.NoncurrentVersionTransitions = make([]*s3.NoncurrentVersionTransition, 0, len(transitions))
+				for _, transition := range nonCurrentTransitions {
+					transitionValue := transition.(map[string]interface{})
+					t := &s3.NoncurrentVersionTransition{}
+					if val, ok := transitionValue["non_current_days"].(int); ok && val >= 0 {
+						t.NoncurrentDays = aws.Int64(int64(val))
+					}
+					if val, ok := transitionValue["storage_class"].(string); ok && val != "" {
+						t.StorageClass = aws.String(val)
+					}
+
+					rule.NoncurrentVersionTransitions = append(rule.NoncurrentVersionTransitions, t)
+				}
+			}
+
+			// Non Current Expiration
+			nonCurrentExpirations := d.Get(fmt.Sprintf("lifecycle_rules.%d.non_current_expiration", i)).(*schema.Set).List()
+			if len(nonCurrentExpirations) > 0 {
+				nonCurrentExpiration := nonCurrentExpirations[0].(map[string]interface{})
+				e := &s3.NoncurrentVersionExpiration{}
+
+				if val, ok := nonCurrentExpiration["non_current_days"].(int); ok && val > 0 {
+					e.NoncurrentDays = aws.Int64(int64(val))
+				}
+
+				rule.NoncurrentVersionExpiration = e
+			}
 			rules = append(rules, rule)
 		}
 
@@ -1597,6 +1719,15 @@ func expirationHash(v interface{}) int {
 	return hashcode.String(buf.String())
 }
 
+func nonCurrentExpirationHash(v interface{}) int {
+	var buf bytes.Buffer
+	m := v.(map[string]interface{})
+	if v, ok := m["non_current_days"]; ok {
+		buf.WriteString(fmt.Sprintf("%d-", v.(int)))
+	}
+	return hashcode.String(buf.String())
+}
+
 func transitionHash(v interface{}) int {
 	var buf bytes.Buffer
 	m := v.(map[string]interface{})
@@ -1604,6 +1735,18 @@ func transitionHash(v interface{}) int {
 		buf.WriteString(fmt.Sprintf("%s-", v.(string)))
 	}
 	if v, ok := m["days"]; ok {
+		buf.WriteString(fmt.Sprintf("%d-", v.(int)))
+	}
+	if v, ok := m["storage_class"]; ok {
+		buf.WriteString(fmt.Sprintf("%s-", v.(string)))
+	}
+	return hashcode.String(buf.String())
+}
+
+func nonCurrentTransitionHash(v interface{}) int {
+	var buf bytes.Buffer
+	m := v.(map[string]interface{})
+	if v, ok := m["non_current_days"]; ok {
 		buf.WriteString(fmt.Sprintf("%d-", v.(int)))
 	}
 	if v, ok := m["storage_class"]; ok {

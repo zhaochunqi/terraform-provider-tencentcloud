@@ -1,3 +1,16 @@
+## 1.61.10 (February 22, 2022)
+
+ENHANCEMENTS:
+
+* resource `tencentcloud_instance` support Data Disk size modification
+* resource generic gaap support client_ip_method
+
+## 1.61.9 (February 21, 2022)
+
+ENHANCEMENTS:
+
+* resource `tencentcloud_cos_bucket` support Multi-AZ bucket import, Non-Current Version Lifecycle and ACL body
+
 ## 1.61.8 (February 17, 2022)
 
 ENHANCEMENTS:

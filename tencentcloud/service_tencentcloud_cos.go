@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/tencentyun/cos-go-sdk-v5"
 
@@ -21,6 +22,8 @@ import (
 type CosService struct {
 	client *connectivity.TencentCloudClient
 }
+
+const PUBLIC_GRANTEE = "http://cam.qcloud.com/groups/global/AllUsers"
 
 func (me *CosService) HeadObject(ctx context.Context, bucket, key string) (info *s3.HeadObjectOutput, errRet error) {
 	logId := getLogId(ctx)
@@ -224,6 +227,29 @@ func (me *CosService) HeadBucket(ctx context.Context, bucket string) (errRet err
 	return nil
 }
 
+func (me *CosService) TencentcloudHeadBucket(ctx context.Context, bucket string) (code int, header http.Header, errRet error) {
+	logId := getLogId(ctx)
+
+	response, err := me.client.UseTencentCosClient(bucket).Bucket.Head(ctx)
+
+	if response != nil {
+		code = response.StatusCode
+		header = response.Header
+	}
+
+	if err != nil {
+		log.Printf("[CRITAL]%s api[%s] fail, reason[%s]\n",
+			logId, "HeadBucket", err.Error())
+		errRet = err
+		return
+	}
+
+	log.Printf("[DEBUG]%s api[%s] success\n",
+		logId, "HeadBucket")
+
+	return
+}
+
 func (me *CosService) DeleteBucket(ctx context.Context, bucket string) (errRet error) {
 	logId := getLogId(ctx)
 
@@ -353,6 +379,30 @@ func (me *CosService) GetBucketLifecycle(ctx context.Context, bucket string) (li
 				rule["expiration"] = schema.NewSet(expirationHash, []interface{}{e})
 			}
 
+			// transition
+			if len(value.NoncurrentVersionTransitions) > 0 {
+				transitions := make([]interface{}, 0, len(value.NoncurrentVersionTransitions))
+				for _, v := range value.NoncurrentVersionTransitions {
+					t := make(map[string]interface{})
+					if v.NoncurrentDays != nil {
+						t["non_current_days"] = int(*v.NoncurrentDays)
+					}
+					if v.StorageClass != nil {
+						t["storage_class"] = *v.StorageClass
+					}
+					transitions = append(transitions, t)
+				}
+				rule["non_current_transition"] = schema.NewSet(transitionHash, transitions)
+			}
+			// non current expiration
+			if value.NoncurrentVersionExpiration != nil {
+				e := make(map[string]interface{})
+				if value.NoncurrentVersionExpiration.NoncurrentDays != nil {
+					e["non_current_days"] = int(*value.NoncurrentVersionExpiration.NoncurrentDays)
+				}
+				rule["non_current_expiration"] = schema.NewSet(nonCurrentExpirationHash, []interface{}{e})
+			}
+
 			lifecycleRules = append(lifecycleRules, rule)
 		}
 	}
@@ -424,6 +474,29 @@ func (me *CosService) GetDataSourceBucketLifecycle(ctx context.Context, bucket s
 					e["days"] = int(*value.Expiration.Days)
 				}
 				rule["expiration"] = []interface{}{e}
+			}
+			// non current transition
+			if len(value.NoncurrentVersionTransitions) > 0 {
+				transitions := make([]interface{}, 0, len(value.NoncurrentVersionTransitions))
+				for _, v := range value.NoncurrentVersionTransitions {
+					t := make(map[string]interface{})
+					if v.NoncurrentDays != nil {
+						t["non_current_days"] = int(*v.NoncurrentDays)
+					}
+					if v.StorageClass != nil {
+						t["storage_class"] = *v.StorageClass
+					}
+					transitions = append(transitions, t)
+				}
+				rule["non_current_transition"] = transitions
+			}
+			// non current expiration
+			if value.NoncurrentVersionExpiration != nil {
+				e := make(map[string]interface{})
+				if value.NoncurrentVersionExpiration.NoncurrentDays != nil {
+					e["non_current_days"] = int(*value.NoncurrentVersionExpiration.NoncurrentDays)
+				}
+				rule["non_current_expiration"] = []interface{}{e}
 			}
 
 			lifecycleRules = append(lifecycleRules, rule)
@@ -823,7 +896,7 @@ func (me *CosService) DeleteBucketPolicy(ctx context.Context, bucket string) (er
 	return nil
 }
 
-func (me *CosService) GetBucketACLXML(ctx context.Context, bucket string) (result *string, errRet error) {
+func (me *CosService) GetBucketACL(ctx context.Context, bucket string) (result *cos.BucketGetACLResult, errRet error) {
 	logId := getLogId(ctx)
 
 	defer func() {
@@ -834,11 +907,11 @@ func (me *CosService) GetBucketACLXML(ctx context.Context, bucket string) (resul
 	}()
 
 	ratelimit.Check("TencentcloudCosPutBucketACL")
-	acl, response, err := me.client.UseTencentCosClient(bucket).Bucket.GetACL(ctx)
+	acl, _, err := me.client.UseTencentCosClient(bucket).Bucket.GetACL(ctx)
 
 	if err != nil {
 		errRet = fmt.Errorf("cos [GetBucketACL] error: %s, bucket: %s", err.Error(), bucket)
-		return nil, errRet
+		return
 	}
 
 	aclXML, err := xml.Marshal(acl)
@@ -848,12 +921,38 @@ func (me *CosService) GetBucketACLXML(ctx context.Context, bucket string) (resul
 		return nil, errRet
 	}
 
-	resp, _ := json.Marshal(response)
+	log.Printf("[DEBUG]%s api[%s] success, response body:\n%s\n",
+		logId, "GetBucketACL", aclXML)
 
-	log.Printf("[DEBUG]%s api[%s] success, request body response body [%s]\n",
-		logId, "GetBucketACL", resp)
+	result = acl
 
-	return helper.String(string(aclXML)), nil
+	return
+}
+
+func GetBucketPublicACL(acl *cos.BucketGetACLResult) string {
+	var publicRead, publicWrite bool
+
+	for i := range acl.AccessControlList {
+		item := acl.AccessControlList[i]
+
+		if item.Grantee.URI == PUBLIC_GRANTEE && item.Permission == "READ" {
+			publicRead = true
+		}
+
+		if item.Grantee.URI == PUBLIC_GRANTEE && item.Permission == "WRITE" {
+			publicWrite = true
+		}
+	}
+
+	if publicRead && !publicWrite {
+		return s3.ObjectCannedACLPublicRead
+	}
+
+	if publicRead && publicWrite {
+		return s3.ObjectCannedACLPublicReadWrite
+	}
+
+	return s3.ObjectCannedACLPrivate
 }
 
 func (me *CosService) GetBucketPullOrigin(ctx context.Context, bucket string) (result []map[string]interface{}, errRet error) {

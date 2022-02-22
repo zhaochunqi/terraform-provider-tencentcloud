@@ -14,7 +14,9 @@ package tencentcloud
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
@@ -146,6 +148,39 @@ func dataSourceTencentCloudCosBuckets() *schema.Resource {
 											},
 										},
 									},
+									"non_current_transition": {
+										Type:        schema.TypeList,
+										Computed:    true,
+										Description: "Specifies when to transition objects of non current versions and the target storage class.",
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"non_current_days": {
+													Type:        schema.TypeInt,
+													Computed:    true,
+													Description: "Number of days after non current object creation when the specific rule action takes effect.",
+												},
+												"storage_class": {
+													Type:        schema.TypeString,
+													Computed:    true,
+													Description: "Specifies the storage class to which you want the non current object to transition. Available values include STANDARD, STANDARD_IA and ARCHIVE.",
+												},
+											},
+										},
+									},
+									"non_current_expiration": {
+										Type:        schema.TypeList,
+										Computed:    true,
+										Description: "Specifies when non current object versions shall expire.",
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"non_current_days": {
+													Type:        schema.TypeInt,
+													Computed:    true,
+													Description: "Number of days after non current object creation when the specific rule action takes effect. The maximum value is 3650.",
+												},
+											},
+										},
+									},
 								},
 							},
 						},
@@ -271,10 +306,15 @@ func dataSourceTencentCloudCosBuckets() *schema.Resource {
 								},
 							},
 						},
+						"acl": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "Bucket access control configurations.",
+						},
 						"acl_body": {
 							Type:        schema.TypeString,
 							Computed:    true,
-							Description: "Bucket acl configurations.",
+							Description: "Bucket verbose acl configurations.",
 						},
 						"tags": {
 							Type:        schema.TypeMap,
@@ -366,11 +406,20 @@ func dataSourceTencentCloudCosBucketsRead(d *schema.ResourceData, meta interface
 			bucket["origin_domain_rules"] = domainRules
 		}
 
-		aclBody, err := cosService.GetBucketACLXML(ctx, *v.Name)
+		aclBody, err := cosService.GetBucketACL(ctx, *v.Name)
+
 		if err != nil {
 			return err
 		}
-		bucket["acl_body"] = aclBody
+
+		aclXML, err := xml.Marshal(aclBody)
+
+		if err != nil {
+			log.Printf("WARN: acl body marshal failed: %s", err.Error())
+		} else {
+			bucket["acl"] = GetBucketPublicACL(aclBody)
+			bucket["acl_body"] = string(aclXML)
+		}
 
 		bucket["tags"] = respTags
 		bucket["cos_bucket_url"] = fmt.Sprintf("%s.cos.%s.myqcloud.com", *v.Name, meta.(*TencentCloudClient).apiV3Conn.Region)

@@ -33,7 +33,8 @@ The following arguments are supported:
 In addition to all arguments above, the following attributes are exported:
 
 * `bucket_list` - A list of bucket. Each element contains the following attributes:
-  * `acl_body` - Bucket acl configurations.
+  * `acl_body` - Bucket verbose acl configurations.
+  * `acl` - Bucket access control configurations.
   * `bucket` - Bucket name, the format likes `<bucket>-<appid>`.
   * `cors_rules` - A list of CORS rule configurations.
     * `allowed_headers` - Specifies which headers are allowed.
@@ -47,6 +48,11 @@ In addition to all arguments above, the following attributes are exported:
       * `date` - Specifies the date after which you want the corresponding action to take effect.
       * `days` - Specifies the number of days after object creation when the specific rule action takes effect.
     * `filter_prefix` - Object key prefix identifying one or more objects to which the rule applies.
+    * `non_current_expiration` - Specifies when non current object versions shall expire.
+      * `non_current_days` - Number of days after non current object creation when the specific rule action takes effect. The maximum value is 3650.
+    * `non_current_transition` - Specifies when to transition objects of non current versions and the target storage class.
+      * `non_current_days` - Number of days after non current object creation when the specific rule action takes effect.
+      * `storage_class` - Specifies the storage class to which you want the non current object to transition. Available values include STANDARD, STANDARD_IA and ARCHIVE.
     * `transition` - Specifies a period in the object's transitions.
       * `date` - Specifies the date after which you want the corresponding action to take effect.
       * `days` - Specifies the number of days after object creation when the specific rule action takes effect.
