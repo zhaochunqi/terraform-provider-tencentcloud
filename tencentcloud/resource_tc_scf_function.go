@@ -126,7 +126,7 @@ func resourceTencentCloudScfFunction() *schema.Resource {
 				Optional: true,
 				Default:  128,
 				ValidateFunc: helper.ComposeValidateFunc(
-					validateIntegerInRange(128, 1536),
+					validateIntegerInRange(128, 3072),
 					func(v interface{}, k string) (wss []string, errs []error) {
 						if v.(int)%128 != 0 {
 							errs = append(errs, errors.Errorf("%s should be with 128M as the ladder", k))
