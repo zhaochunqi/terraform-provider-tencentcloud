@@ -399,12 +399,14 @@ func resourceTencentCloudAPIGatewayAPICreate(d *schema.ResourceData, meta interf
 		scfFunctionName := d.Get("service_config_scf_function_name").(string)
 		scfFunctionNamespace := d.Get("service_config_scf_function_namespace").(string)
 		scfFunctionQualifier := d.Get("service_config_scf_function_qualifier").(string)
+		scfFunctionType := d.Get("service_config_scf_function_type").(string)
 		if scfFunctionName == "" || scfFunctionNamespace == "" || scfFunctionQualifier == "" {
 			return fmt.Errorf("`service_config_scf_function_name`,`service_config_scf_function_namespace`,`service_config_scf_function_qualifier` is needed if `service_config_type` is `SCF`")
 		}
 		request.ServiceScfFunctionName = &scfFunctionName
 		request.ServiceScfFunctionNamespace = &scfFunctionNamespace
 		request.ServiceScfFunctionQualifier = &scfFunctionQualifier
+		request.ServiceScfFunctionType = &scfFunctionType
 	}
 
 	request.ResponseType = helper.String(d.Get("response_type").(string))
