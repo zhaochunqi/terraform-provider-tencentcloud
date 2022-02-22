@@ -216,6 +216,11 @@ func dataSourceTencentCloudAPIGatewayAPIs() *schema.Resource {
 							Computed:    true,
 							Description: "SCF function version. This parameter takes effect when `service_config_type`  is `SCF`.",
 						},
+						"service_config_scf_function_type": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "scf函数类型。当后端类型是SCF时生效。支持事件触发(EVENT)，http直通云函数(HTTP)。",
+						},
 						"service_config_mock_return_message": {
 							Type:        schema.TypeString,
 							Computed:    true,
